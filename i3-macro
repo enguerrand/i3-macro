@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+function print_usage(){
+	cat <<- EOF
+	Usage: $(basename $0) CMD [CMD_ARGS]
+
+	with
+	    CMD:        The command to use (see valid commands below)
+	    CMD_ARGS:   The arguments to be passed to the command
+
+	valid commands:
+
+	    help                        Print this help
+
+	    toggle_pseudo_maximize      Use a new workspace to emulate
+	                                maximizing the currently focused container
+
+	EOF
+}
+
+function die(){
+	echo
+	echo "Error: $@" >&2
+	echo
+	print_usage
+	exit -1
+}
+
+function print_current_ws_prop(){
+    local _field_name=$1
+    i3-msg -t get_workspaces | jq ' .[] | select(.focused==true) | .'${_field_name}
+}
+
+function print_current_ws_num(){
+    print_current_ws_prop "num"
+}
+
+function print_current_ws_name(){
+    print_current_ws_prop "name" | tr -d \"
+}
+
+function toggle_pseudo_maximize(){
+	local _offset=${1-"10"}
+	local _current_ws_num=$(print_current_ws_num)
+	local _current_ws_name=$(print_current_ws_name)
+	# TODO: check that the workspace name starts with _current_ws_num
+	if [ ${_current_ws_num} -le ${_offset} ]; then
+		_dst_ws_num=$((_current_ws_num+_offset))
+	else
+		_dst_ws_num=$((_current_ws_num-_offset))
+	fi
+	local _dst_ws_name=$(echo $_current_ws_name | sed -e "s/^${_current_ws_num}/${_dst_ws_num}/")
+	i3-msg move container to workspace ${_dst_ws_name}
+	i3-msg workspace ${_dst_ws_name}
+}
+
+CMD=$1
+[ -z "$CMD" ] && die "Parameter CMD missing!"
+shift
+
+case $CMD in
+	'help')
+		print_usage
+		;;
+	'toggle_pseudo_maximize')
+		toggle_pseudo_maximize $@
+		;;
+	*)
+		die "Unknown command: $CMD"
+		;;
+esac
