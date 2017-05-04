@@ -12,6 +12,10 @@ function print_usage(){
 
 	    help                        Print this help
 
+	    move_split                  Intuitively move the split. Required args:
+	                                   type: (up|down|left|right)
+	                                   increment: (integer value)
+
 	    toggle_pseudo_maximize      Use a new workspace to emulate
 	                                maximizing the currently focused container
 
@@ -39,6 +43,85 @@ function print_current_ws_name(){
     print_current_ws_prop "name" | tr -d \"
 }
 
+function print_current_container_prop(){
+	local _prop_name=$1
+	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.focused==true) | .'$_prop_name
+}
+
+function print_parent_container_prop(){
+	local _prop_name=$1
+	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.nodes[].focused==true) | .'$_prop_name
+}
+
+function is_last_container(){
+	local _coordinate_name=$1
+	local _dim_name=$2
+	local _container_co=$(print_current_container_prop rect.${_coordinate_name})
+	local _container_dim=$(print_current_container_prop rect.${_dim_name})
+	local _container_edge_coordinate=$((_container_co+_container_dim))
+	local _parent_co=$(print_parent_container_prop rect.${_coordinate_name})
+	local _parent_dim=$(print_parent_container_prop rect.${_dim_name})
+	local _parent_edge_coordinate=$((_parent_co+_parent_dim))
+	if [ $_container_edge_coordinate -ge $_parent_edge_coordinate ] && [ $_container_dim -lt $_parent_dim ];then
+		echo "true"
+	else
+		echo "false"
+	fi
+}
+
+function is_bottom_container(){
+	is_last_container "y" "height"
+}
+
+function is_right_most_container(){
+	is_last_container "x" "width"
+}
+
+function move_split(){
+	local _type=$1
+	local _increment=$2
+	local _dimension
+	local _action
+	case $_type in
+		'up')
+			_dimension="height"
+			if [ "$(is_bottom_container)" == "true" ];then
+				_action="grow"
+			else
+				_action="shrink"
+			fi
+			;;
+		'down')
+			_dimension="height"
+			if [ "$(is_bottom_container)" == "true" ];then
+				_action="shrink"
+			else
+				_action="grow"
+			fi
+			;;
+		'left')
+			_dimension="width"
+			if [ "$(is_right_most_container)" == "true" ];then
+				_action="grow"
+			else
+				_action="shrink"
+			fi
+			;;
+		'right')
+			_dimension="width"
+			if [ "$(is_right_most_container)" == "true" ];then
+				_action="shrink"
+			else
+				_action="grow"
+			fi
+			;;
+		*)
+			die "Invalid move_split type $_type"
+			;;
+	esac
+	i3-msg resize $_action $_dimension $_increment px or $_increment ppt
+}
+
 function toggle_pseudo_maximize(){
 	local _offset=${1-"10"}
 	local _current_ws_num=$(print_current_ws_num)
@@ -62,8 +145,19 @@ case $CMD in
 	'help')
 		print_usage
 		;;
+	'move_split')
+		move_split $@
+		;;
 	'toggle_pseudo_maximize')
 		toggle_pseudo_maximize $@
+		;;
+	'x')
+		# For debugging purposes
+		is_right_most_container $@
+		;;
+	'y')
+		# For debugging purposes
+		is_bottom_container $@
 		;;
 	*)
 		die "Unknown command: $CMD"
