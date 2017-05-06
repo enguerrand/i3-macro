@@ -43,26 +43,44 @@ function print_current_ws_name(){
     print_current_ws_prop "name" | tr -d \"
 }
 
-function print_current_container_prop(){
-	local _prop_name=$1
-	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.focused==true) | .'$_prop_name
+function print_container_by_id(){
+	local _id=$1
+	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.id=='$_id')'
 }
 
-function print_parent_container_prop(){
-	local _prop_name=$1
-	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.nodes[].focused==true) | .'$_prop_name
+function_print_parent_container_by_id(){
+	local _id=$1
+	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.nodes[].id=='$_id')'
+}
+
+function print_focused_container(){
+	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.focused==true)'
 }
 
 function is_last_container(){
 	local _coordinate_name=$1
 	local _dim_name=$2
-	local _container_co=$(print_current_container_prop rect.${_coordinate_name})
-	local _container_dim=$(print_current_container_prop rect.${_dim_name})
+	local _container_id
+	local _current_container
+	if [ $# -gt 2 ];then
+		local _container_id=$3
+		_current_container=$(print_container_by_id $_container_id)
+	else
+		_current_container=$(print_focused_container)
+		_container_id=$(echo "$_current_container" | jq '.id')
+	fi
+	local _parent_container=$(function_print_parent_container_by_id $_container_id)	
+
+	local _container_co=$(echo "$_current_container" | jq .rect.${_coordinate_name})
+	local _container_dim=$(echo "$_current_container" | jq .rect.${_dim_name})
 	local _container_edge_coordinate=$((_container_co+_container_dim))
-	local _parent_co=$(print_parent_container_prop rect.${_coordinate_name})
-	local _parent_dim=$(print_parent_container_prop rect.${_dim_name})
+	local _parent_co=$(echo "$_parent_container" | jq .rect.${_coordinate_name})
+	local _parent_dim=$(echo "$_parent_container" | jq .rect.${_dim_name})
 	local _parent_edge_coordinate=$((_parent_co+_parent_dim))
-	if [ $_container_edge_coordinate -ge $_parent_edge_coordinate ] && [ $_container_dim -lt $_parent_dim ];then
+	if [ $_container_dim -ge $_parent_dim ];then
+		local _parent_container_id=$(echo "$_parent_container" | jq .id)
+		is_last_container $_coordinate_name $_dim_name $_parent_container_id
+	elif [ $_container_edge_coordinate -ge $_parent_edge_coordinate ];then
 		echo "true"
 	else
 		echo "false"
