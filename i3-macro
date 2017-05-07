@@ -30,6 +30,10 @@ function die(){
 	exit -1
 }
 
+function debug(){
+	[ -n "$DEBUG" ] && echo "$@" >&2
+}
+
 function print_current_ws_prop(){
     local _field_name=$1
     i3-msg -t get_workspaces | jq ' .[] | select(.focused==true) | .'${_field_name}
@@ -62,6 +66,7 @@ function is_last_container(){
 	local _dim_name=$2
 	local _container_id
 	local _current_container
+	debug "is_last_container $@"
 	if [ $# -gt 2 ];then
 		local _container_id=$3
 		_current_container=$(print_container_by_id $_container_id)
@@ -69,20 +74,36 @@ function is_last_container(){
 		_current_container=$(print_focused_container)
 		_container_id=$(echo "$_current_container" | jq '.id')
 	fi
+	debug "Container id: "$_container_id
 	local _parent_container=$(function_print_parent_container_by_id $_container_id)	
-
 	local _container_co=$(echo "$_current_container" | jq .rect.${_coordinate_name})
 	local _container_dim=$(echo "$_current_container" | jq .rect.${_dim_name})
 	local _container_edge_coordinate=$((_container_co+_container_dim))
 	local _parent_co=$(echo "$_parent_container" | jq .rect.${_coordinate_name})
 	local _parent_dim=$(echo "$_parent_container" | jq .rect.${_dim_name})
 	local _parent_edge_coordinate=$((_parent_co+_parent_dim))
+	local _ws_dim=$(print_current_ws_prop rect.$_dim_name)
+	debug "_container_co: "$_container_co
+	debug "_container_dim: "$_container_dim
+	debug "_container_edge_coordinate: "$_container_edge_coordinate
+	debug "_parent_co: "$_parent_co
+	debug "_parent_dim: "$_parent_dim
+	debug "_parent_edge_coordinate: "$_parent_edge_coordinate
+	debug "_ws_dim: "$_ws_dim
 	if [ $_container_dim -ge $_parent_dim ];then
+		debug "recurse to parent"
 		local _parent_container_id=$(echo "$_parent_container" | jq .id)
 		is_last_container $_coordinate_name $_dim_name $_parent_container_id
+	elif [ "$_dim_name" == "height" ] && [ $_parent_co -le 19 ] && [ $_container_co -lt 40 ] && [ $_container_dim -lt $_ws_dim ];then
+		# FIXME Ugly workaround for strange return values for parent container in some cases. (Somehow linked to bar?)
+		# Need to understand the behavior better.
+		debug "return false workaround"
+		echo "false"
 	elif [ $_container_edge_coordinate -ge $_parent_edge_coordinate ];then
+		debug "return true"
 		echo "true"
 	else
+		debug "return false"
 		echo "false"
 	fi
 }
