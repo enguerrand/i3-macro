@@ -185,6 +185,8 @@ CMD=$1
 [ -z "$CMD" ] && die "Parameter CMD missing!"
 shift
 
+jq -h > /dev/null 2>&1 || die "This tool requires jq. Please install that first!"
+
 case $CMD in
 	'help')
 		print_usage
