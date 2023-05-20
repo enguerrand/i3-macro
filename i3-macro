@@ -1,5 +1,9 @@
 #!/bin/bash
 set -e
+
+msg_cmd="i3-msg"
+[ "$(basename "$0")"  == "sway-macro" ] && msg_cmd="swaymsg"
+
 function print_usage(){
 	cat <<- EOF
 	Usage: $(basename $0) CMD [CMD_ARGS]
@@ -36,7 +40,7 @@ function debug(){
 
 function print_current_ws_prop(){
     local _field_name=$1
-    i3-msg -t get_workspaces | jq ' .[] | select(.focused==true) | .'${_field_name}
+    ${msg_cmd} -t get_workspaces | jq ' .[] | select(.focused==true) | .'${_field_name}
 }
 
 function print_current_ws_num(){
@@ -49,16 +53,16 @@ function print_current_ws_name(){
 
 function print_container_by_id(){
 	local _id=$1
-	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.id=='$_id')'
+	${msg_cmd} -t get_tree | jq ' recurse(.nodes[]) | select(.id=='$_id')'
 }
 
 function_print_parent_container_by_id(){
 	local _id=$1
-	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.nodes[].id=='$_id')'
+	${msg_cmd} -t get_tree | jq ' recurse(.nodes[]) | select(.nodes[].id=='$_id')'
 }
 
 function print_focused_container(){
-	i3-msg -t get_tree | jq ' recurse(.nodes[]) | select(.focused==true)'
+	${msg_cmd} -t get_tree | jq ' recurse(.nodes[]) | select(.focused==true)'
 }
 
 function is_last_container(){
@@ -163,7 +167,7 @@ function move_split(){
 			die "Invalid move_split type $_type"
 			;;
 	esac
-	i3-msg resize $_action $_dimension $_increment px or $_increment ppt
+	${msg_cmd} resize $_action $_dimension $_increment px or $_increment ppt
 }
 
 function toggle_pseudo_maximize(){
@@ -177,8 +181,8 @@ function toggle_pseudo_maximize(){
 		_dst_ws_num=$((_current_ws_num-_offset))
 	fi
 	local _dst_ws_name=$(echo $_current_ws_name | sed -e "s/^${_current_ws_num}/${_dst_ws_num}/")
-	i3-msg move container to workspace ${_dst_ws_name}
-	i3-msg workspace ${_dst_ws_name}
+	${msg_cmd} move container to workspace ${_dst_ws_name}
+	${msg_cmd} workspace ${_dst_ws_name}
 }
 
 CMD=$1
